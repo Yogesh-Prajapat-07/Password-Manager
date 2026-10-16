@@ -53,14 +53,14 @@ export default function VaultAccess({
       if (isSetup) {
         const encryptedVault = await encryptVault(masterPassword, [])
 
-        const response = await fetch("http://localhost:5000/api/vault", {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(encryptedVault),
-        })
+       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/vault`, {
+  method: 'PUT',
+  headers: {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${authData.token}`,
+  },
+  body: JSON.stringify(encryptedVault),
+})
 
         const data = await response.json()
 
@@ -70,12 +70,15 @@ export default function VaultAccess({
 
         onComplete(masterPassword, [])
       } else {
-        const response = await fetch("http://localhost:5000/api/vault", {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
+       const response = await fetch(
+  `${import.meta.env.VITE_API_URL}/api/vault`,
+  {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  }
+)
 
         const data = await response.json()
 

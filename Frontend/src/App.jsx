@@ -38,14 +38,14 @@ function App() {
     // Encrypt the complete vault in the browser before sending it.
     const encryptedVault = await encryptVault(masterPassword, passwords)
 
-    const response = await fetch('http://localhost:5000/api/vault', {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${authData.token}`,
-      },
-      body: JSON.stringify(encryptedVault),
-    })
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/vault`, {
+  method: 'PUT',
+  headers: {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${authData.token}`,
+  },
+  body: JSON.stringify(encryptedVault),
+})
 
     const data = await response.json()
 
