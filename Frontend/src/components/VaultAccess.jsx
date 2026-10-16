@@ -57,7 +57,7 @@ export default function VaultAccess({
   method: 'PUT',
   headers: {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${authData.token}`,
+   Authorization: `Bearer ${token}`,
   },
   body: JSON.stringify(encryptedVault),
 })
