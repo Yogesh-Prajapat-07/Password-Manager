@@ -1,22 +1,23 @@
-import React from 'react'
-import { useRef, useState, useEffect } from 'react';
-import { ToastContainer, toast, Bounce } from 'react-toastify';
-import { v4 as uuidv4 } from 'uuid';
-import 'react-toastify/dist/ReactToastify.css';
+import React, { useRef, useState } from 'react'
+import { ToastContainer, toast, Bounce } from 'react-toastify'
+import { v4 as uuidv4 } from 'uuid'
+import 'react-toastify/dist/ReactToastify.css'
 
 
-const Manager = () => {
+
+const Manager = ({ passwords = [], setPasswords, saveVault }) => {
   const ref = useRef()
   const passwordRef = useRef()
-  const [form, setform] = useState({ site: "", username: "", password: "" })
-  const [passwordArray, setPasswordArray] = useState([])
 
-  useEffect(() => {
-    let passwords = localStorage.getItem("passwords");
-    if (passwords) {
-      setPasswordArray(JSON.parse(passwords));
-    }
-  }, [])
+  const [form, setform] = useState({
+    site: '',
+    username: '',
+    password: '',
+  })
+
+  const [visiblePasswords, setVisiblePasswords] = useState({})
+  const [editingId, setEditingId] = useState(null)
+  const [saving, setSaving] = useState(false)
 
   const copyText = (text) => {
     toast('Copied to clipboard', {
@@ -48,58 +49,108 @@ const Manager = () => {
     }
   }
 
-  const savePassword = () => {
-        if(form.site.length >3 && form.username.length >3 &&form.password.length >3){
-
-            setPasswordArray([...passwordArray, {...form, id: uuidv4()}])
-            localStorage.setItem("passwords", JSON.stringify([...passwordArray, {...form, id: uuidv4()}]))
-            console.log([...passwordArray, form])
-            setform({ site: "", username: "", password: "" })
-            toast('Password saved!', {
-            position: "top-right",
-            autoClose: 5000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-            progress: undefined,
-            theme: "dark",
-        });
-    }
-    else{
-        toast('Error: Password not saved!');
-    }
-
-    }
-
-  const deletePassword = (id) => {
-    console.log("Deleting password with id", id)
-     let c = confirm("Do you really want to delete the password?")
-     if(c){
-       setPasswordArray(passwordArray.filter(item=>item.id!==id))
-       localStorage.setItem("passwords", JSON.stringify(passwordArray.filter(item=> item.id!==id)))
-      }
-      toast('Password Deleted!', {
-      position: "top-right",
-      autoClose: 5000,
-      hideProgressBar: false,
-      closeOnClick: false,
-      pauseOnHover: true,
-      draggable: true,
-      progress: undefined,
-      theme: "dark",
-      transition: Bounce,
-    });
+const savePassword = async () => {
+  if (
+    form.site.trim().length <= 3 ||
+    form.username.trim().length <= 3 ||
+    form.password.length <= 3
+  ) {
+    toast.error('Error: Password not saved!')
+    return
   }
+
+  if (saving) return
+
+  const nextPasswords = editingId
+    ? passwords.map((item) =>
+        item.id === editingId
+          ? { ...form, id: editingId }
+          : item
+      )
+    : [...passwords, { ...form, id: uuidv4() }]
+
+  setSaving(true)
+
+  try {
+    await saveVault(nextPasswords)
+
+    setPasswords(nextPasswords)
+    setform({ site: '', username: '', password: '' })
+    setEditingId(null)
+
+    if (passwordRef.current) {
+      passwordRef.current.type = 'password'
+    }
+    if (ref.current) {
+      ref.current.src = 'icons/eye.png'
+    }
+
+    toast.success(editingId ? 'Password updated!' : 'Password saved!', {
+      position: 'bottom-right',
+      autoClose: 3000,
+      theme: 'dark',
+    })
+  } catch (error) {
+    toast.error(error.message || 'Unable to save password.')
+  } finally {
+    setSaving(false)
+  }
+}
+
+ const deletePassword = async (id) => {
+  const confirmed = window.confirm(
+    'Do you really want to delete the password?'
+  )
+
+  if (!confirmed || saving) return
+
+  const nextPasswords = passwords.filter((item) => item.id !== id)
+
+  setSaving(true)
+
+  try {
+    await saveVault(nextPasswords)
+    setPasswords(nextPasswords)
+
+    if (editingId === id) {
+      setEditingId(null)
+      setform({ site: '', username: '', password: '' })
+    }
+
+    toast.success('Password deleted!', {
+      position: 'bottom-right',
+      autoClose: 3000,
+      theme: 'dark',
+    })
+  } catch (error) {
+    toast.error(error.message || 'Unable to delete password.')
+  } finally {
+    setSaving(false)
+  }
+}
   
 
-  const editPassword = (id) => {
+ const editPassword = (id) => {
+  const selected = passwords.find((item) => item.id === id)
 
-    console.log("Editing password with id", id)
-    setform(passwordArray.filter(i=>i.id===id[0]))
-      setPasswordArray(passwordArray.filter(item=>item.id!==id))
- 
+  if (!selected) return
+
+  setform({
+    site: selected.site,
+    username: selected.username,
+    password: selected.password,
+  })
+
+  setEditingId(id)
+
+  if (passwordRef.current) {
+    passwordRef.current.type = 'password'
   }
+
+  if (ref.current) {
+    ref.current.src = 'icons/eye.png'
+  }
+}
 
   const handleChange = (e) => {
     setform({ ...form, [e.target.name]: e.target.value })
@@ -108,8 +159,8 @@ const Manager = () => {
   return (
     <>
       <ToastContainer
-        position="top-right"
-        autoClose={5000}
+        position="bottom-right"
+        autoClose={3000}
         hideProgressBar={false}
         newestOnTop={false}
         closeOnClick={false}
@@ -124,13 +175,19 @@ const Manager = () => {
       <ToastContainer />
       
       <div className="absolute top-0 z-[-2] h-screen w-screen rotate-180 transform bg-emerald-50 bg-[radial-gradient(60%_120%_at_50%_50%,hsla(0,0%,100%,0)_0,rgba(252,205,238,.5)_100%)]"></div >
-      <div className="p-3 md:mycontainer min-h-[88.2vh]">
-        <h1 className='text-4xl text font-bold text-center'>
-          <span className='text-emerald-500'>  &lt;</span>
+      <div className="p-3 md:mycontainer min-h-[88.2vh] pb-8">
+        
+       <div className="flex flex-col items-center justify-center mb-4">
+  <img
+    src="/pass-op.png"
+    alt="PassOP Password Manager"
+    className="h-36 w-auto object-contain"
+  />
 
-          <span>Pass</span><span className='text-emerald-500'>OP/&gt;</span>
+  
+</div>
 
-        </h1>
+        
         <p className='text-emerald-900 text-lg text-center'>Your own Password Manager</p>
 
         <div className="flex flex-col p-4 text-black gap-8 items-center ">
@@ -146,18 +203,24 @@ const Manager = () => {
             </div>
 
           </div>
-          <button onClick={savePassword} className='flex  justify-center items-center gap-2 bg-emerald-400 hover:bg-emerald-300 rounded-full px-8 py-2 w-fit border border-emerald-900'>
-            <lord-icon
-              src="https://cdn.lordicon.com/efxgwrkc.json"
-              trigger="hover">
-            </lord-icon>
-            Save</button>
+         <button
+  onClick={savePassword}
+  disabled={saving}
+  className="flex justify-center items-center gap-2 bg-emerald-400 hover:bg-emerald-300 rounded-full px-8 py-2 w-fit border border-emerald-900 disabled:opacity-50"
+>
+  <lord-icon
+    src="https://cdn.lordicon.com/efxgwrkc.json"
+    trigger="hover"
+  />
+  {saving ? 'Saving...' : editingId ? 'Update' : 'Save'}
+</button>
         </div>
 
         <div className="passwords">
           <h2 className='font-bold text-2xl py-4'>Your Passwords</h2>
-          {passwordArray.length === 0 && <div> No passwords to show</div>}
-          {passwordArray.length != 0 && <table className="table-auto w-full rounded-md overflow-hidden  mb-10">
+         {passwords.length === 0 && <div>No passwords to show</div>}
+
+         {passwords.length !== 0 && <table className="table-auto w-full rounded-md overflow-hidden  mb-10">
             <thead className='bg-emerald-800  text-white'>
               <tr>
                 <th className='py-2'>Site</th>
@@ -167,7 +230,7 @@ const Manager = () => {
               </tr>
             </thead>
             <tbody className='bg-emerald-100'>
-              {passwordArray.map((item, index) => {
+             {passwords.map((item, index) => {
                 return <tr key={index}>
                   <td className='py-2 border border-white text-center'>
                     <div className='flex items-center justify-center '>
@@ -195,7 +258,22 @@ const Manager = () => {
                   </td>
                   <td className='py-2 border border-white text-center'>
                     <div className='flex items-center justify-center '>
-                      <span>{item.password}</span>
+                      <span>
+  {visiblePasswords[item.id] ? item.password : '••••••••'}
+</span>
+
+<img
+  className="p-1 cursor-pointer"
+  width={26}
+  src={visiblePasswords[item.id] ? "icons/eyecross.png" : "icons/eye.png"}
+  alt="Show/Hide password"
+  onClick={() =>
+    setVisiblePasswords((prev) => ({
+      ...prev,
+      [item.id]: !prev[item.id],
+    }))
+  }
+/>
                       <div className=' lordiconcopy size-7 cursor-pointer' onClick={() => { copyText(item.password) }} >
                         <lord-icon
                           style={{ "width": "25px", "height": "25px", "paddingTop": "3px", "paddingLeft": "3px" }}
